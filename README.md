@@ -1,3 +1,6 @@
+> [!NOTE]
+> This is a Linux-focused fork of [stepandel/chroma-explorer](https://github.com/stepandel/chroma-explorer), pinned to the **`chromadb@1.8.1`** JS client so it can talk to **Chroma 0.x servers** (which expose the legacy `/api/v1` REST API). The upstream project ships the modern `chromadb@3.x` client, which only speaks the `/api/v2` API and uses a different surface (`CloudClient`, modular `@chroma-core/*` embedding packages, new error types, etc.) — that won't connect to a Chroma 0.x server. I needed to keep working against a Chroma 0.x deployment that hadn't been upgraded yet, so this fork rewinds the client and drops the 3.x-only dependencies. Most users should prefer upstream — only use this fork if you're stuck on a Chroma 0.x server and can't upgrade.
+
 <div align="center">
 
 ```
@@ -21,12 +24,6 @@ A desktop application for exploring and managing ChromaDB vector databases. Buil
 ![Chroma Explorer](assets/screenshot.png)
 
 </div>
-
-## Fork Notice
-
-This is a Linux-focused fork of [stepandel/chroma-explorer](https://github.com/stepandel/chroma-explorer), pinned to the **`chromadb@1.8.1`** JS client so it can talk to **Chroma 0.x servers** (which expose the legacy `/api/v1` REST API).
-
-The upstream project ships the modern `chromadb@3.x` client, which only speaks the `/api/v2` API and uses a different surface (`CloudClient`, modular `@chroma-core/*` embedding packages, new error types, etc.) — that won't connect to a Chroma 0.x server. I needed to keep working against a Chroma 0.x deployment that hadn't been upgraded yet, so this fork rewinds the client and drops the 3.x-only dependencies. Most users should prefer upstream — only use this fork if you're stuck on a Chroma 0.x server and can't upgrade.
 
 ## Features
 
