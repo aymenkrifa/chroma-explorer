@@ -1,14 +1,13 @@
 import { useChromaDB } from '../../providers/ChromaDBProvider'
 import { usePanel } from '../../context/PanelContext'
-import { PanelLeft, PanelRight, PanelLeftDashed, PanelRightDashed, Power } from 'lucide-react'
+import { ChevronRight, Power } from 'lucide-react'
+import logoUrl from '../../assets/logo.svg'
 
 export function TopBar() {
   const { currentProfile } = useChromaDB()
   const {
     leftPanelOpen,
     setLeftPanelOpen,
-    rightPanelOpen,
-    setRightPanelOpen,
   } = usePanel()
 
   const handleDisconnect = async () => {
@@ -30,8 +29,31 @@ export function TopBar() {
         WebkitBackdropFilter: 'blur(20px) saturate(1.2)',
       } as React.CSSProperties}
     >
-      {/* Left side - spacing for traffic lights */}
-      <div className="w-[76px]" />
+      {/* Left side — traffic-lights spacer + sidebar reopen.
+          The reopen arrow is anchored to the left edge so it appears next to
+          where the sidebar will slide back in from. The right-inspector
+          reopens on row click, so it has no toggle here. */}
+      <div
+        className="flex items-center gap-0.5"
+        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+      >
+        <div className="w-[76px]" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
+        <img
+          src={logoUrl}
+          alt="Chroma Explorer"
+          className="h-5 w-5 mr-2 rounded-[4px] shrink-0"
+          draggable={false}
+        />
+        {!leftPanelOpen && (
+          <button
+            onClick={() => setLeftPanelOpen(true)}
+            className={iconButtonClass}
+            title="Open sidebar"
+          >
+            <ChevronRight className="h-4 w-4 text-foreground/60" />
+          </button>
+        )}
+      </div>
 
       {/* Center - Connection info */}
       <div className="flex-1 flex items-center justify-center gap-2">
@@ -42,34 +64,11 @@ export function TopBar() {
         <span className="text-[11px] text-foreground/40">{currentProfile?.url}</span>
       </div>
 
-      {/* Right side - Panel toggles + Disconnect */}
+      {/* Right side - Disconnect */}
       <div
         className="flex items-center gap-0.5 pr-3"
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       >
-        <button
-          onClick={() => setLeftPanelOpen(!leftPanelOpen)}
-          className={iconButtonClass}
-          title="Toggle sidebar"
-        >
-          {leftPanelOpen ? (
-            <PanelLeft className="h-4 w-4 text-foreground/70" />
-          ) : (
-            <PanelLeftDashed className="h-4 w-4 text-foreground/40" />
-          )}
-        </button>
-        <button
-          onClick={() => setRightPanelOpen(!rightPanelOpen)}
-          className={iconButtonClass}
-          title="Toggle inspector"
-        >
-          {rightPanelOpen ? (
-            <PanelRight className="h-4 w-4 text-foreground/70" />
-          ) : (
-            <PanelRightDashed className="h-4 w-4 text-foreground/40" />
-          )}
-        </button>
-        <div className="w-px h-4 bg-foreground/10 mx-1" />
         <button
           onClick={handleDisconnect}
           className={`${iconButtonClass} hover:bg-destructive/10 hover:text-destructive`}

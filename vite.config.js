@@ -38,8 +38,12 @@ export default defineConfig({
           build: {
             rollupOptions: {
               external: [
-                '@chroma-core/default-embed',
-                '@chroma-core/sentence-transformer',
+                'chromadb-default-embed',
+                '@xenova/transformers',
+                'cohere-ai',
+                '@google/generative-ai',
+                'openai',
+                'openai/version',
                 'onnxruntime-node',
                 'sharp',
               ],

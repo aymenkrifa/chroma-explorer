@@ -1,4 +1,6 @@
-import { Metadata } from "chromadb"
+// chromadb v1's exported Metadata type isn't reliably present across patch
+// versions — define our own that matches the wire shape (string-keyed scalars).
+type Metadata = Record<string, string | number | boolean>
 
 export type EmbeddingFunctionType =
   | 'default'
@@ -46,6 +48,11 @@ export interface ConnectionProfile {
   authToken?: string // Bearer token for token auth
   authTokenHeader?: 'authorization' | 'x-chroma-token' // header to send token in (default: 'authorization')
   authCredentials?: string // "username:password" for basic auth
+
+  // When true, the UI hides write operations (create / delete / edit /
+  // copy / regenerate-embedding etc.) — purely a UI guard, not enforced
+  // server-side.
+  readOnly?: boolean
 
   createdAt: number // Timestamp
   lastUsed?: number // Timestamp

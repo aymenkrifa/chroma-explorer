@@ -1,11 +1,34 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Plus, X, ChevronDown } from 'lucide-react'
+import { Plus, X, ChevronDown, Copy, Check } from 'lucide-react'
 import EmbeddingCell from './EmbeddingCell'
 import { RegenerateEmbeddingDialog } from './RegenerateEmbeddingDialog'
 import { useUpdateDocumentMutation } from '../../hooks/useChromaQueries'
+import { useChromaDB } from '../../providers/ChromaDBProvider'
 import { SHORTCUTS, matchesShortcut } from '../../constants/keyboard-shortcuts'
-import { Metadata } from 'chromadb'
+type Metadata = Record<string, string | number | boolean>
 import { TypedMetadataRecord, TypedMetadataField, MetadataValueType, validateMetadataValue } from '../../types/metadata'
+
+function CopyButton({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false)
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!value) return
+    void navigator.clipboard.writeText(value).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1200)
+    })
+  }
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      title={copied ? 'Copied!' : 'Copy'}
+      className="h-5 w-5 flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition-colors"
+    >
+      {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+    </button>
+  )
+}
 
 interface DocumentRecord {
   id: string
@@ -43,6 +66,10 @@ export default function DocumentDetailPanel({
 
   // Update mutation
   const updateMutation = useUpdateDocumentMutation(profileId, collectionName)
+
+  // Read-only mode: block all writes from this panel.
+  const { currentProfile } = useChromaDB()
+  const isReadOnly = currentProfile?.readOnly === true
 
   // Ref for embedding textarea
   const embeddingTextareaRef = useRef<HTMLTextAreaElement>(null)
@@ -106,6 +133,7 @@ export default function DocumentDetailPanel({
 
   // Handle save all changes
   const handleSave = useCallback(async () => {
+    if (isReadOnly) return
     // If document changed, show regenerate dialog
     if (hasDocumentChanges) {
       setShowRegenerateDialog(true)
@@ -354,10 +382,13 @@ export default function DocumentDetailPanel({
         boxShadow: 'var(--panel-detail-shadow)',
       }}
     >
-      <div className="h-full overflow-auto space-y-3 p-3">
+      <div className="h-full overflow-auto space-y-3 pt-10 px-3 pb-3">
       {/* ID Section - Editable for drafts */}
       <section>
-        <h3 className="text-xs font-semibold text-muted-foreground mb-1">id</h3>
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="text-xs font-semibold text-muted-foreground">id</h3>
+          <CopyButton value={document.id} />
+        </div>
         {isDraft ? (
           <input
             type="text"
@@ -379,7 +410,10 @@ export default function DocumentDetailPanel({
 
       {/* Document Text Section */}
       <section>
-        <h3 className="text-xs font-semibold text-muted-foreground mb-1">document</h3>
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="text-xs font-semibold text-muted-foreground">document</h3>
+          <CopyButton value={draftDocument ?? ''} />
+        </div>
         <textarea
           rows={1}
           value={draftDocument ?? ''}
@@ -390,6 +424,7 @@ export default function DocumentDetailPanel({
             }
           }}
           placeholder="No document - type to add"
+          readOnly={isReadOnly}
           style={{ fieldSizing: 'content' } as React.CSSProperties}
           className={`w-full text-xs whitespace-pre-wrap overflow-hidden focus:outline-none resize-none ${getFieldStyle(hasDocumentChanges)}`}
         />
@@ -455,8 +490,11 @@ export default function DocumentDetailPanel({
                   </button>
                 </div>
               ) : (
-                // Regular mode - just the label
-                <h3 className="text-xs font-semibold text-muted-foreground mb-1">{key}</h3>
+                // Regular mode - label + copy
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className="text-xs font-semibold text-muted-foreground">{key}</h3>
+                  <CopyButton value={String(displayValue ?? '')} />
+                </div>
               )}
               <textarea
                 rows={1}
@@ -469,6 +507,7 @@ export default function DocumentDetailPanel({
                   }
                 }}
                 placeholder={typedField?.type === 'boolean' ? 'true / false' : typedField?.type === 'number' ? '0' : undefined}
+                readOnly={isReadOnly}
                 style={{ fieldSizing: 'content' } as React.CSSProperties}
                 className={`w-full text-xs whitespace-pre-wrap overflow-hidden focus:outline-none resize-none ${getFieldStyle(isDirty)} ${validationError ? 'border-destructive' : ''}`}
               />
@@ -497,7 +536,10 @@ export default function DocumentDetailPanel({
       {/* Embedding Section - Click to edit (hidden for drafts) */}
       {!isDraft && (
         <section>
-          <h3 className="text-xs font-semibold text-muted-foreground mb-1">embedding</h3>
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="text-xs font-semibold text-muted-foreground">embedding</h3>
+            <CopyButton value={document.embedding ? JSON.stringify(document.embedding) : ''} />
+          </div>
           {isEditingEmbedding ? (
             <div>
               <textarea
@@ -517,8 +559,8 @@ export default function DocumentDetailPanel({
             </div>
           ) : (
             <div
-              onClick={() => setIsEditingEmbedding(true)}
-              className={`cursor-pointer ${getFieldStyle(hasEmbeddingChanges)}`}
+              onClick={() => { if (!isReadOnly) setIsEditingEmbedding(true) }}
+              className={`${isReadOnly ? '' : 'cursor-pointer'} ${getFieldStyle(hasEmbeddingChanges)}`}
             >
               <EmbeddingCell embedding={document.embedding} />
             </div>

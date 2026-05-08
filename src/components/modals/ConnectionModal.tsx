@@ -41,6 +41,7 @@ export default function ConnectionModal({ isOpen, onConnect }: ConnectionModalPr
   const [authToken, setAuthToken] = useState('')
   const [authTokenHeader, setAuthTokenHeader] = useState<'authorization' | 'x-chroma-token'>('authorization')
   const [authCredentials, setAuthCredentials] = useState('')
+  const [readOnly, setReadOnly] = useState(false)
   const [error, setError] = useState('')
   const [isConnecting, setIsConnecting] = useState(false)
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => getSystemTheme())
@@ -143,6 +144,7 @@ export default function ConnectionModal({ isOpen, onConnect }: ConnectionModalPr
       setAuthToken(profile.authToken || '')
       setAuthTokenHeader(profile.authTokenHeader || 'authorization')
       setAuthCredentials(profile.authCredentials || '')
+      setReadOnly(profile.readOnly === true)
     }
   }
 
@@ -157,6 +159,7 @@ export default function ConnectionModal({ isOpen, onConnect }: ConnectionModalPr
     setAuthToken('')
     setAuthTokenHeader('authorization')
     setAuthCredentials('')
+    setReadOnly(false)
   }
 
   const handleDeleteProfile = async (profileId: string) => {
@@ -251,6 +254,7 @@ export default function ConnectionModal({ isOpen, onConnect }: ConnectionModalPr
 
       if (tenant.trim()) profile.tenant = tenant.trim()
       if (database.trim()) profile.database = database.trim()
+      if (readOnly) profile.readOnly = true
 
       if (connectionType === 'cloud') {
         if (apiKey.trim()) profile.apiKey = apiKey.trim()
@@ -474,6 +478,21 @@ export default function ConnectionModal({ isOpen, onConnect }: ConnectionModalPr
                     />
                   </div>
                 )}
+
+                {/* Read-only toggle */}
+                <div className="flex items-center gap-3 pt-1">
+                  <div className="w-16" />
+                  <label className="flex items-center gap-2 text-[12px] text-foreground/70 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={readOnly}
+                      onChange={(e) => setReadOnly(e.target.checked)}
+                      className="h-3.5 w-3.5 cursor-pointer accent-current"
+                    />
+                    <span>Read-only mode</span>
+                    <span className="text-[10px] text-foreground/40">— hides write actions in the UI</span>
+                  </label>
+                </div>
               </div>
             </div>
 

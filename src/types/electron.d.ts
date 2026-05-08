@@ -29,6 +29,7 @@ declare global {
     tenant?: string
     database?: string
     apiKey?: string
+    readOnly?: boolean
     createdAt: number
     lastUsed?: number
     embeddingOverrides?: Record<string, EmbeddingFunctionOverride>

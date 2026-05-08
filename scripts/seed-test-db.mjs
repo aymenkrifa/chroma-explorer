@@ -25,7 +25,13 @@ if (authMode === 'token') {
   process.exit(1)
 }
 
-const client = new ChromaClient({ host: 'localhost', port, ssl: false, headers })
+const clientArgs = { path: `http://localhost:${port}` }
+if (authMode === 'token') {
+  clientArgs.auth = { provider: 'token', credentials: TOKEN, providerOptions: { headerType: 'AUTHORIZATION' } }
+} else if (authMode === 'basic') {
+  clientArgs.auth = { provider: 'basic', credentials: BASIC }
+}
+const client = new ChromaClient(clientArgs)
 
 const EMBED_DIM = 8
 

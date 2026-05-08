@@ -13,8 +13,8 @@ import { ConnectionProfile, SearchDocumentsParams, UpdateDocumentParams, CreateD
 import { initAutoUpdater, checkForUpdates } from './auto-updater'
 import { initAnalytics, track } from './analytics'
 
-// Inject stored API keys into process.env at startup
-settingsStore.injectIntoProcessEnv()
+// API keys are injected into process.env after app.whenReady() resolves —
+// safeStorage.isEncryptionAvailable() returns false on Linux until then.
 
 // Track active copy operations per profile for cancellation
 const activeCopyOperations: Map<string, AbortController> = new Map()
@@ -160,7 +160,7 @@ ipcMain.handle('chromadb:createCollection', async (_event, profileId: string, pa
     }
     const collection = await service.createCollection(params)
     track('collection_created', {
-      distanceFunction: params.hnsw?.space || params.metadata?.['hnsw:space'] || 'default'
+      distanceFunction: (params.hnsw?.space || (params.metadata?.['hnsw:space'] as string | undefined) || 'default') as string
     })
     return { success: true, data: collection }
   } catch (error) {
@@ -585,6 +585,8 @@ ipcMain.handle('shell:openExternal', async (_event, url: string) => {
 initAnalytics()
 
 app.whenReady().then(() => {
+  settingsStore.injectIntoProcessEnv()
+
   track('app_started')
 
   // Create application menu

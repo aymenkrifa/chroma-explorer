@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, ChevronLeft } from 'lucide-react'
 import { useChromaDB } from '../../providers/ChromaDBProvider'
+import { usePanel } from '../../context/PanelContext'
 import { useCollection } from '../../context/CollectionContext'
 import { useDraftCollection } from '../../context/DraftCollectionContext'
 import { useClipboard } from '../../context/ClipboardContext'
@@ -17,6 +18,7 @@ export function CollectionPanel() {
   const { activeCollection, setActiveCollection } = useCollection()
   const { draftCollection, startCreation, startCopyFromCollection, updateDraft, cancelCreation } = useDraftCollection()
   const { clipboard, copyCollection, hasCopiedCollection } = useClipboard()
+  const { setLeftPanelOpen } = usePanel()
   const [searchTerm, setSearchTerm] = useState('')
 
   // Deletion state
@@ -115,17 +117,21 @@ export function CollectionPanel() {
   }, [clipboard, draftCollection, startCopyFromCollection])
 
   // Context menu handler for collection item
+  const isReadOnly = currentProfile?.readOnly === true
+
   const handleContextMenu = useCallback((e: React.MouseEvent, collectionName: string) => {
     e.preventDefault()
     e.stopPropagation()
+    if (isReadOnly) return
     window.electronAPI.contextMenu.showCollectionMenu(collectionName, { hasCopiedCollection })
-  }, [hasCopiedCollection])
+  }, [hasCopiedCollection, isReadOnly])
 
   // Context menu handler for empty space in panel
   const handlePanelContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
+    if (isReadOnly) return
     window.electronAPI.contextMenu.showCollectionPanelMenu({ hasCopiedCollection })
-  }, [hasCopiedCollection])
+  }, [hasCopiedCollection, isReadOnly])
 
   // Context menu action listener
   useEffect(() => {
@@ -251,6 +257,16 @@ export function CollectionPanel() {
     >
       {/* Header */}
       <div className="px-4 py-2">
+        {/* Collapse arrow row, sits just above the search input */}
+        <div className="flex justify-end mb-1">
+          <button
+            onClick={() => setLeftPanelOpen(false)}
+            title="Collapse sidebar"
+            className="h-5 w-5 flex items-center justify-center rounded hover:bg-black/[0.06] dark:hover:bg-white/[0.08] text-foreground/50 hover:text-foreground/80 transition-colors"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </button>
+        </div>
         {/* Search input and add button */}
         <div className="flex items-center gap-1.5">
           <div className="relative flex-1">
@@ -271,15 +287,17 @@ export function CollectionPanel() {
               </button>
             )}
           </div>
-          <button
-            onClick={handleCreateClick}
-            disabled={!!draftCollection}
-            className="h-6 w-6 flex-shrink-0 flex items-center justify-center rounded-md bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.10] disabled:opacity-50 disabled:cursor-not-allowed transition-colors translate-y-px"
-            style={inputStyle}
-            title="Create new collection"
-          >
-            <Plus className="h-2 w-2" />
-          </button>
+          {!isReadOnly && (
+            <button
+              onClick={handleCreateClick}
+              disabled={!!draftCollection}
+              className="h-6 w-6 flex-shrink-0 flex items-center justify-center rounded-md bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.10] disabled:opacity-50 disabled:cursor-not-allowed transition-colors translate-y-px"
+              style={inputStyle}
+              title="Create new collection"
+            >
+              <Plus className="h-2 w-2" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -364,8 +382,8 @@ export function CollectionPanel() {
         )}
       </div>
 
-      {/* Footer - only shown when in deletion mode */}
-      {markedForDeletion && !draftCollection && (
+      {/* Footer - only shown when in deletion mode (never in read-only) */}
+      {markedForDeletion && !draftCollection && !isReadOnly && (
         <div className="px-4 py-2 bg-black/[0.02] dark:bg-white/[0.02]">
           <div className="flex items-center gap-1.5">
             <button

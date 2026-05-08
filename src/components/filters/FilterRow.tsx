@@ -1,4 +1,5 @@
 import { FilterRow as FilterRowType, MetadataOperator } from '../../types/filters'
+import { DateRangeFilter } from './DateRangeFilter'
 
 interface FilterRowProps {
   row: FilterRowType
@@ -11,6 +12,7 @@ interface FilterRowProps {
   nResults?: number
   onNResultsChange?: (n: number) => void
   metadataFields?: string[]
+  dateField?: string // metadata field name to use for the date filter (e.g. 'timestamp')
 }
 
 const operatorLabels: Record<MetadataOperator, string> = {
@@ -38,6 +40,7 @@ export function FilterRow({
   nResults,
   onNResultsChange,
   metadataFields = [],
+  dateField,
 }: FilterRowProps) {
   const handleTypeChange = (value: string) => {
     if (value === 'search') {
@@ -49,6 +52,9 @@ export function FilterRow({
         metadataValue: undefined,
         selectField: undefined,
         selectValue: undefined,
+        dateFrom: undefined,
+        dateTo: undefined,
+        datePreset: undefined,
       })
     } else if (value === 'select:id') {
       onChange(row.id, {
@@ -59,6 +65,23 @@ export function FilterRow({
         metadataValue: undefined,
         selectField: 'id',
         selectValue: '',
+        dateFrom: undefined,
+        dateTo: undefined,
+        datePreset: undefined,
+      })
+    } else if (value === 'date' && dateField) {
+      onChange(row.id, {
+        type: 'date',
+        searchValue: undefined,
+        metadataKey: undefined,
+        operator: undefined,
+        metadataValue: undefined,
+        selectField: undefined,
+        selectValue: undefined,
+        dateField,
+        dateFrom: undefined,
+        dateTo: undefined,
+        datePreset: undefined,
       })
     } else {
       // value is a metadata field name
@@ -74,12 +97,14 @@ export function FilterRow({
     }
   }
 
-  // Get current select value: 'search', 'select:id', or the metadata key
+  // Get current select value: 'search', 'select:id', 'date', or the metadata key
   const selectValue = row.type === 'search'
     ? 'search'
     : row.type === 'select'
       ? `select:${row.selectField || 'id'}`
-      : (row.metadataKey || '')
+      : row.type === 'date'
+        ? 'date'
+        : (row.metadataKey || '')
 
   // Ensure current metadataKey is always in the options (in case filtered docs don't have it)
   const allFields = row.metadataKey && !metadataFields.includes(row.metadataKey)
@@ -101,6 +126,11 @@ export function FilterRow({
         <optgroup label="Select">
           <option value="select:id">ID</option>
         </optgroup>
+        {dateField && (
+          <optgroup label="Date">
+            <option value="date">{dateField}</option>
+          </optgroup>
+        )}
         {allFields.length > 0 && (
           <optgroup label="Filter">
             {allFields.map(field => (
@@ -128,6 +158,17 @@ export function FilterRow({
           placeholder="Document ID..."
           className={`flex-1 ${inputClassName}`}
           style={inputStyle}
+        />
+      ) : row.type === 'date' ? (
+        <DateRangeFilter
+          from={row.dateFrom}
+          to={row.dateTo}
+          preset={row.datePreset}
+          onChange={(next) => onChange(row.id, {
+            dateFrom: next.from,
+            dateTo: next.to,
+            datePreset: next.preset,
+          })}
         />
       ) : (
         <>

@@ -278,7 +278,7 @@ export default function DocumentsTable({
   }, [])
 
   // Extract all unique metadata keys from documents
-  const metadataKeys = useMemo(() =>
+  const allMetadataKeys = useMemo(() =>
     Array.from(
       new Set(
         documents.flatMap(doc =>
@@ -289,15 +289,71 @@ export default function DocumentsTable({
     [documents]
   )
 
+  // Show a dedicated leftmost "date" column whenever any document carries a
+  // `timestamp` metadata field. When that column is shown, hide `timestamp`
+  // from the dynamic metadata columns to avoid showing it twice.
+  const hasTimestamp = allMetadataKeys.includes('timestamp')
+  const metadataKeys = useMemo(
+    () => hasTimestamp ? allMetadataKeys.filter(k => k !== 'timestamp') : allMetadataKeys,
+    [allMetadataKeys, hasTimestamp]
+  )
+
   // Check if any documents have distance scores (semantic search results)
   const hasDistances = useMemo(() =>
     documents.some(doc => doc.distance !== undefined && doc.distance !== null),
     [documents]
   )
 
+  // Format a Unix-seconds timestamp into a compact, locale-aware date+time.
+  // Falls back to a plain string for ISO-like values; returns null for
+  // anything unparseable so the cell renders "-".
+  const formatTimestamp = (raw: unknown): string | null => {
+    if (raw === null || raw === undefined) return null
+    let date: Date | null = null
+    if (typeof raw === 'number') {
+      // Heuristic: < 1e12 → seconds, else milliseconds
+      const ms = raw < 1e12 ? raw * 1000 : raw
+      date = new Date(ms)
+    } else if (typeof raw === 'string') {
+      const asNumber = Number(raw)
+      if (!isNaN(asNumber) && raw.trim() !== '') {
+        const ms = asNumber < 1e12 ? asNumber * 1000 : asNumber
+        date = new Date(ms)
+      } else {
+        const parsed = new Date(raw)
+        if (!isNaN(parsed.getTime())) date = parsed
+      }
+    }
+    if (!date || isNaN(date.getTime())) return null
+    const d = String(date.getDate()).padStart(2, '0')
+    const m = String(date.getMonth() + 1).padStart(2, '0')
+    const y = date.getFullYear()
+    const hh = String(date.getHours()).padStart(2, '0')
+    const mm = String(date.getMinutes()).padStart(2, '0')
+    return `${d}/${m}/${y} ${hh}:${mm}`
+  }
+
   // Define columns
   const columns = useMemo<ColumnDef<DocumentRecord>[]>(() => {
     const baseColumns: ColumnDef<DocumentRecord>[] = []
+
+    // Leftmost: human-readable date derived from metadata.timestamp
+    if (hasTimestamp) {
+      baseColumns.push({
+        id: 'date',
+        header: 'date',
+        size: 150,
+        accessorFn: (row) => row.metadata?.timestamp,
+        cell: info => {
+          const formatted = formatTimestamp(info.getValue())
+          return (
+            <div className="text-xs text-foreground whitespace-nowrap">
+              {formatted ?? <span className="text-muted-foreground italic">-</span>}
+            </div>
+          )
+        },
+      })
+    }
 
     // Add distance column only when we have semantic search results
     if (hasDistances) {
@@ -373,7 +429,7 @@ export default function DocumentsTable({
     }))
 
     return [...baseColumns, ...metadataColumns]
-  }, [metadataKeys, hasDistances])
+  }, [metadataKeys, hasDistances, hasTimestamp])
 
   const [columnResizeMode] = useState<ColumnResizeMode>('onChange')
 
@@ -471,9 +527,11 @@ export default function DocumentsTable({
         <tbody className="select-none">
           {/* Draft rows for creating/pasting documents */}
           {draftDocuments.length > 0 && onDraftChange && draftDocuments.map((draft, draftIndex) => {
-            // Column indices depend on whether distance column is shown
-            const idColIndex = hasDistances ? 1 : 0
-            const docColIndex = hasDistances ? 2 : 1
+            // Column indices: optional date col first, then optional distance col, then id, document
+            const dateOffset = hasTimestamp ? 1 : 0
+            const distOffset = hasDistances ? 1 : 0
+            const idColIndex = dateOffset + distOffset
+            const docColIndex = idColIndex + 1
             return (
             <tr
               key={`draft-${draftIndex}`}
@@ -483,11 +541,20 @@ export default function DocumentsTable({
               onMouseDown={(e) => handleMouseDown(e, draftIndex)}
               onMouseEnter={() => handleMouseEnter(draftIndex)}
             >
+              {/* Date cell - empty placeholder when date column is visible */}
+              {hasTimestamp && (
+                <td
+                  className="pl-3 py-0.5 align-top "
+                  style={{ width: table.getHeaderGroups()[0]?.headers[0]?.getSize() }}
+                >
+                  <div className="text-xs text-muted-foreground italic">-</div>
+                </td>
+              )}
               {/* Distance cell - empty placeholder when distance column is visible */}
               {hasDistances && (
                 <td
                   className="pl-3 py-0.5 align-top "
-                  style={{ width: table.getHeaderGroups()[0]?.headers[0]?.getSize() }}
+                  style={{ width: table.getHeaderGroups()[0]?.headers[dateOffset]?.getSize() }}
                 >
                   <div className="text-xs font-mono text-muted-foreground text-center">-</div>
                 </td>
@@ -569,9 +636,11 @@ export default function DocumentsTable({
               rowBgClass = adjustedIndex % 2 === 1 ? 'bg-black/[0.04] dark:bg-white/[0.04]' : ''
             }
 
-            // Column indices depend on whether distance column is shown
-            const idColIndex = hasDistances ? 1 : 0
-            const docColIndex = hasDistances ? 2 : 1
+            // Column indices: optional date col first, then optional distance col, then id, document
+            const dateOffset = hasTimestamp ? 1 : 0
+            const distOffset = hasDistances ? 1 : 0
+            const idColIndex = dateOffset + distOffset
+            const docColIndex = idColIndex + 1
 
             // Render editing row
             if (isEditing && editingState) {
@@ -581,11 +650,23 @@ export default function DocumentsTable({
                   className={`transition-colors cursor-pointer ${rowBgClass}`}
                   onContextMenu={(e) => onDocumentContextMenu?.(e, row.original.id)}
                 >
+                  {/* Date cell - display formatted timestamp when date column is visible */}
+                  {hasTimestamp && (
+                    <td
+                      className="pl-3 py-0.5 align-top "
+                      style={{ width: table.getHeaderGroups()[0]?.headers[0]?.getSize() }}
+                    >
+                      <div className="text-xs text-foreground whitespace-nowrap">
+                        {formatTimestamp(row.original.metadata?.timestamp) ??
+                          <span className="text-muted-foreground italic">-</span>}
+                      </div>
+                    </td>
+                  )}
                   {/* Distance cell - display only when distance column is visible */}
                   {hasDistances && (
                     <td
                       className="pl-3 py-0.5 align-top "
-                      style={{ width: table.getHeaderGroups()[0]?.headers[0]?.getSize() }}
+                      style={{ width: table.getHeaderGroups()[0]?.headers[dateOffset]?.getSize() }}
                     >
                       <div className="text-xs font-mono text-muted-foreground text-center">
                         {row.original.distance !== undefined && row.original.distance !== null

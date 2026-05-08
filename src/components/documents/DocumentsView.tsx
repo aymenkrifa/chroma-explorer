@@ -65,6 +65,7 @@ export default function DocumentsView({
   onIsFirstDocumentChange,
 }: DocumentsViewProps) {
   const { currentProfile } = useChromaDB()
+  const isReadOnly = currentProfile?.readOnly === true
   const [filterRows, setFilterRows] = useState<FilterRowType[]>([createDefaultFilterRow()])
   const [nResults, setNResults] = useState(10)
 
@@ -201,18 +202,50 @@ export default function DocumentsView({
       return trimmed
     }
 
-    // Extract metadata filters from metadata-type rows
-    const metadataRows = filterRows.filter(
-      r => r.type === 'metadata' && r.metadataKey?.trim() && r.metadataValue?.trim()
-    )
-    const metadataFilter = metadataRows.length > 0
-      ? metadataRows.reduce((acc, row) => ({
-          ...acc,
-          [row.metadataKey!]: {
-            [row.operator || '$eq']: parseFilterValue(row.metadataValue!, row.operator || '$eq')
-          },
-        }), {})
-      : undefined
+    // Each "clause" is a where fragment like { key: { $op: value } }.
+    // Multiple clauses get combined with $and at the top level — Chroma
+    // 0.5.x rejects { key: { $gte: a, $lte: b } } (multi-op same field),
+    // so we emit { $and: [{ key: { $gte: a } }, { key: { $lte: b } }] }
+    // instead. Single-clause queries stay flat.
+    const clauses: Array<Record<string, unknown>> = []
+
+    // Metadata filter rows
+    for (const row of filterRows) {
+      if (row.type !== 'metadata') continue
+      if (!row.metadataKey?.trim() || !row.metadataValue?.trim()) continue
+      const op = row.operator || '$eq'
+      const value = parseFilterValue(row.metadataValue!, op)
+      clauses.push({ [row.metadataKey!]: { [op]: value } })
+    }
+
+    // Date range rows: each from/to bound becomes its own clause so we never
+    // emit multi-op-same-field, which 0.5.x rejects.
+    for (const row of filterRows) {
+      if (row.type !== 'date' || !row.dateField) continue
+      if (!row.dateFrom && !row.dateTo) continue
+      const key = row.dateField
+      if (row.dateFrom) {
+        const d = new Date(row.dateFrom + 'T00:00:00')
+        clauses.push({ [key]: { $gte: Math.floor(d.getTime() / 1000) } })
+      }
+      if (row.dateTo) {
+        const d = new Date(row.dateTo + 'T23:59:59.999')
+        clauses.push({ [key]: { $lte: Math.floor(d.getTime() / 1000) } })
+      }
+    }
+
+    let metadataFilter: Record<string, unknown> | undefined
+    if (clauses.length === 0) {
+      metadataFilter = undefined
+    } else if (clauses.length === 1) {
+      metadataFilter = clauses[0]
+    } else {
+      metadataFilter = { $and: clauses }
+    }
+
+    if (metadataFilter) {
+      console.log('[DocumentsView] where filter:', JSON.stringify(metadataFilter))
+    }
 
     return {
       collectionName,
@@ -288,11 +321,17 @@ export default function DocumentsView({
   const hasActiveFilters = filterRows.some(row =>
     (row.type === 'search' && row.searchValue?.trim()) ||
     (row.type === 'metadata' && row.metadataKey?.trim() && row.metadataValue?.trim()) ||
-    (row.type === 'select' && row.selectValue?.trim())
+    (row.type === 'select' && row.selectValue?.trim()) ||
+    (row.type === 'date' && (row.dateFrom || row.dateTo))
   )
+
+  // Show the date filter option when the loaded documents actually carry a
+  // `timestamp` metadata field. Stays absent on collections without it.
+  const dateField = metadataFields.includes('timestamp') ? 'timestamp' : undefined
 
   // Draft document handlers
   const handleStartCreate = useCallback(() => {
+    if (isReadOnly) return
     const newId = crypto.randomUUID()
     // Check if this is the first document (collection is empty)
     const isFirstDocument = documents.length === 0
@@ -365,6 +404,7 @@ export default function DocumentsView({
   }, [onClearSelection, onIsFirstDocumentChange])
 
   const handleSaveDraft = useCallback(async () => {
+    if (isReadOnly) return
     if (draftDocuments.length === 0) return
     setDraftError(null)
 
@@ -431,6 +471,7 @@ export default function DocumentsView({
 
   // Toggle deletion mark for all selected documents
   const handleToggleDeletion = useCallback(() => {
+    if (isReadOnly) return
     if (selectedDocumentIds.size === 0) return
     // Filter out drafts from selection
     const draftIds = new Set(draftDocuments.map(d => d.id))
@@ -456,6 +497,7 @@ export default function DocumentsView({
 
   // Commit deletions
   const handleCommitDeletions = useCallback(async () => {
+    if (isReadOnly) return
     if (markedForDeletion.size === 0) return
 
     try {
@@ -524,6 +566,7 @@ export default function DocumentsView({
 
   // Paste documents from clipboard - creates draft documents for review
   const handlePasteDocuments = useCallback(() => {
+    if (isReadOnly) return
     if (!clipboard || clipboard.type !== 'documents' || !currentProfile?.id) return
     if (hasDrafts) return // Don't paste if there are already drafts
 
@@ -594,20 +637,23 @@ export default function DocumentsView({
   const handleDocumentContextMenu = useCallback((e: React.MouseEvent, documentId: string) => {
     e.preventDefault()
     e.stopPropagation()
+    if (isReadOnly) return
     window.electronAPI.contextMenu.showDocumentMenu(documentId, { hasCopiedDocuments })
-  }, [hasCopiedDocuments])
+  }, [hasCopiedDocuments, isReadOnly])
 
   // Context menu handler for empty space in table
   const handleTableContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
+    if (isReadOnly) return
     window.electronAPI.contextMenu.showDocumentsPanelMenu({ hasCopiedDocuments })
-  }, [hasCopiedDocuments])
+  }, [hasCopiedDocuments, isReadOnly])
 
   // Inline document update handler
   const handleInlineDocumentUpdate = useCallback(async (
     documentId: string,
     updates: { document?: string; metadata?: Record<string, unknown> }
   ) => {
+    if (isReadOnly) return
     await updateMutation.mutateAsync({
       documentId,
       document: updates.document,
@@ -862,6 +908,7 @@ export default function DocumentsView({
               nResults={nResults}
               onNResultsChange={setNResults}
               metadataFields={metadataFields}
+              dateField={dateField}
             />
           ))}
         </div>
@@ -889,7 +936,7 @@ export default function DocumentsView({
           onDraftChange={handleDraftChange}
           onDraftCancel={handleCancelDraft}
           markedForDeletion={markedForDeletion}
-          onDocumentUpdate={handleInlineDocumentUpdate}
+          onDocumentUpdate={isReadOnly ? undefined : handleInlineDocumentUpdate}
           onDocumentContextMenu={handleDocumentContextMenu}
           onTableContextMenu={handleTableContextMenu}
         />
@@ -897,14 +944,18 @@ export default function DocumentsView({
 
       {/* Bottom Toolbar */}
       <div className="px-4 py-1.5 flex items-center justify-between">
-        <button
-          onClick={handleStartCreate}
-          disabled={hasDrafts || markedForDeletion.size > 0}
-          className="h-6 w-6 p-0 text-[11px] rounded-md bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.10] disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Add document"
-        >
-          +
-        </button>
+        {!isReadOnly ? (
+          <button
+            onClick={handleStartCreate}
+            disabled={hasDrafts || markedForDeletion.size > 0}
+            className="h-6 w-6 p-0 text-[11px] rounded-md bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.10] disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Add document"
+          >
+            +
+          </button>
+        ) : (
+          <span className="text-[11px] text-muted-foreground">Read-only</span>
+        )}
         {hasDrafts && (
           <div className="flex items-center gap-3">
             {draftError && (

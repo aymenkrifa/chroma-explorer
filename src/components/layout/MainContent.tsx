@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
+import { X } from 'lucide-react'
 import { useCollection } from '../../context/CollectionContext'
 import { useDraftCollection } from '../../context/DraftCollectionContext'
 import { usePanel } from '../../context/PanelContext'
@@ -24,6 +25,7 @@ export function MainContent() {
     leftPanelWidth,
     setLeftPanelWidth,
     rightPanelOpen,
+    setRightPanelOpen,
     rightPanelWidth,
     setRightPanelWidth,
     selectedDocumentIds,
@@ -160,6 +162,16 @@ export function MainContent() {
         }`}
         style={{ width: `${rightPanelWidth}px` }}
       >
+        {/* Close button - sits over the panel content, top-right */}
+        {rightPanelOpen && (
+          <button
+            onClick={() => setRightPanelOpen(false)}
+            title="Close inspector"
+            className="absolute top-2 right-2 z-30 h-6 w-6 flex items-center justify-center rounded hover:bg-black/[0.06] dark:hover:bg-white/[0.08] text-foreground/50 hover:text-foreground/80 transition-colors"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
         {selectedDocument && activeCollection && currentProfile ? (
           <DocumentDetailPanel
             document={selectedDocument}

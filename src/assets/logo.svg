@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Chroma Explorer">
+  <defs>
+    <linearGradient id="ce-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#ec4899"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="96" ry="96" fill="url(#ce-bg)"/>
+  <path d="M 360 150 A 120 120 0 1 0 360 362" fill="none" stroke="#ffffff" stroke-width="44" stroke-linecap="round"/>
+  <circle cx="362" cy="256" r="24" fill="#ffffff"/>
+</svg>

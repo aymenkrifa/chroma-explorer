@@ -250,7 +250,10 @@ class WindowManager {
         windowId,
         profileId
       }))
-      win.webContents.openDevTools()
+      // DevTools no longer auto-opens; set CHROMA_DEVTOOLS=1 to bring it back.
+      if (process.env.CHROMA_DEVTOOLS === '1') {
+        win.webContents.openDevTools()
+      }
     } else {
       win.loadFile(path.join(process.env.DIST!, 'index.html'), {
         query: {

@@ -20,7 +20,15 @@ export interface DocumentFilters {
 }
 
 // New filter row types
-export type FilterRowType = 'search' | 'metadata' | 'select'
+export type FilterRowType = 'search' | 'metadata' | 'select' | 'date'
+
+export type DatePreset =
+  | 'today'
+  | 'yesterday'
+  | 'last-7-days'
+  | 'last-30-days'
+  | 'this-month'
+  | 'custom'
 
 export interface FilterRow {
   id: string
@@ -34,4 +42,10 @@ export interface FilterRow {
   // For select type
   selectField?: 'id'
   selectValue?: string
+  // For date type. Stored as YYYY-MM-DD; converted to Unix-seconds
+  // bounds at query time. Either side may be empty for open-ended ranges.
+  dateField?: string // metadata field name, defaults to 'timestamp'
+  dateFrom?: string
+  dateTo?: string
+  datePreset?: DatePreset
 }
